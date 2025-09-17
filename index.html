@@ -1,0 +1,1086 @@
+<html lang="ar" dir="rtl"><!-- Changed language to Arabic and direction to Right-to-Left --><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تتبع الحروف بالترتيب</title> <!-- Translated title -->
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            background-color: white; 
+            text-align: center;
+        }
+        h1 { color: #333; }
+        #svg-container {
+            position: relative; /* Added for positioning zoom buttons */
+            width: 100%;
+            max-width: 1024px;
+            border: 3px solid #333;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+            touch-action: none;
+            background-color: white; 
+            overflow: hidden;
+            transition: all 0.3s ease-in-out; /* For smooth viewBox transitions */
+        }
+        #svg-container.zoomed-in {
+            /* Optional: Add styles here if you want the container to change when zoomed */
+        }
+        #svg { /* Keeping 'svg' as the ID as in your base code */
+            display: block;
+            width: 100%;
+            height: auto;
+            cursor: crosshair;
+            transition: all 0.3s ease-in-out; /* Smooth viewBox transitions */
+        }
+        .buttons {
+            margin-top: 25px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap; /* Added for responsiveness */
+            align-items: center; /* Align items vertically in the center */
+        }
+        button {
+            padding: 12px 25px;
+            font-size: 18px;
+            cursor: pointer;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background-color: #fff;
+            font-weight: bold;
+            transition: all 0.2s;
+            white-space: nowrap; /* Prevent text wrapping inside buttons */
+            margin: 5px; /* Added some margin for spacing on wrap */
+        }
+        button:hover { background-color: #e9e9e9; }
+        button:active { transform: scale(0.95); }
+        button:disabled {
+            cursor: not-allowed;
+            background-color: #ccc;
+        }
+        #guide-dot {
+            pointer-events: none;
+            display: block; 
+        }
+
+        /* --- Zoom Controls CSS --- */
+        #zoom-icon {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            line-height: 1;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            color: #333;
+            z-index: 10;
+            transition: background-color 0.2s;
+        }
+        #zoom-icon.zoomed {
+            background-color: #e9e9e9; 
+        }
+        #zoom-icon.hidden {
+            display: none;
+        }
+
+        #zoom-adjust-controls {
+            position: absolute;
+            top: 60px; 
+            left: 10px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        #zoom-adjust-controls.hidden {
+            display: none;
+        }
+        #zoom-adjust-controls button {
+            width: 35px;
+            height: 35px;
+            font-size: 24px;
+            font-weight: bold;
+            line-height: 1;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            color: #333;
+        }
+        #zoom-adjust-controls button:hover {
+            background-color: white;
+        }
+        #zoom-adjust-controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* --- Applause Effect (Confetti) Styles --- */
+        #confetti-container { /* New container for full-page confetti */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none; /* Allows clicks to pass through */
+            opacity: 0; 
+            z-index: 1000;
+            overflow: hidden; 
+            transition: opacity 0.5s ease-out;
+            background-color: transparent; /* Ensures no background layer */
+        }
+        #confetti-container.visible {
+            opacity: 1;
+        }
+
+        #applause-message { /* New container for the text message */
+            position: fixed;
+            bottom: 50px; /* Position at the bottom */
+            left: 50%;
+            transform: translateX(-50%); /* Center horizontally */
+            text-align: center;
+            font-size: 1em; /* Adjusted for smaller "Awesome Job!" font */
+            color: forestgreen; /* Changed to green font */
+            font-weight: bold;
+            text-shadow: 2px 2px 3px rgba(0,0,0,0.5);
+            z-index: 1001; /* Higher z-index than confetti */
+            opacity: 0; 
+            transition: opacity 0.5s ease-out;
+            pointer-events: none; /* Allows clicks to pass through */
+        }
+        #applause-message.visible {
+            opacity: 1;
+        }
+
+        .confetti-piece {
+            position: absolute;
+            background-color: currentColor; 
+            width: 10px;
+            height: 10px;
+            border-radius: 50%; 
+            opacity: 0;
+            animation: confetti-fall 3s ease-out forwards;
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* Specific styles for audio icon buttons */
+        button.audio-icon-button {
+            width: 50px;
+            height: 50px;
+            padding: 0; /* Remove padding to make it a compact icon */
+            font-size: 24px; /* Icon size */
+            border-radius: 50%; /* Make it round */
+            background-color: #f0f0f0; /* Light background */
+            color: #333; /* Dark icon color */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #333;
+            line-height: 1; /* Ensures vertical centering of icon */
+            flex-shrink: 0; /* Prevent shrinking on smaller screens */
+            margin: 5px; /* Maintain consistent margin with other buttons */
+        }
+
+        button.audio-icon-button:hover {
+            background-color: #e0e0e0;
+            transform: scale(1.05); /* Slightly enlarge on hover */
+        }
+
+        button.audio-icon-button:active {
+            transform: scale(0.95); /* Shrink on click */
+        }
+    </style>
+</head>
+<body>
+    <h1>تتبع الحروف بالترتيب!</h1> <!-- Translated H1 -->
+    <div id="svg-container">
+        <!-- Zoom controls -->
+        <button id="zoom-icon" aria-label="تكبير">🔍</button> <!-- Translated aria-label -->
+        <div id="zoom-adjust-controls" class="hidden">
+            <button id="zoom-in-adjust-button" title="تكبير أكثر">+</button> <!-- Translated title -->
+            <button id="zoom-out-adjust-button" title="تصغير أكثر">-</button> <!-- Translated title -->
+        </div>
+
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+            <defs>
+                <clipPath id="letter-mask">
+                    <path d="M815.041 121C820.969 139.25 825.148 161.074 827.58 186.473 829.1 202.289 830.62 239.702 832.139 298.711 834.875 325.783 838.827 343.12 843.994 350.724 848.25 357.112 852.885 360.306 857.901 360.306L873.686 360.306 889.818 360.306 1059.49 360.306C1043.99 348.291 1030.91 338.938 1020.28 332.246 1007.05 323.881 994.97 317.798 984.027 313.996 971.717 309.737 959.254 307.608 946.639 307.608 938.888 307.608 931.061 308.141 923.157 309.205 927.565 297.951 933.34 288.902 940.484 282.058 950.819 272.173 963.889 267.23 979.696 267.23 995.198 267.23 1013.51 274.834 1034.64 290.043 1045.13 297.647 1062.22 312.095 1085.93 333.387 1104.32 349.964 1116.79 358.937 1123.32 360.306L1137 360.306 1137 400 889.818 400 873.686 400 857.901 400C847.566 400 839.283 395.818 833.051 387.453 827.58 380.153 823.438 369.279 820.627 354.831 817.815 340.383 815.649 322.589 814.129 301.449 813.217 284.263 812.267 266.621 811.279 248.523 810.292 230.425 809 216.699 807.404 207.346 805.808 197.993 803.642 190.351 800.907 184.419 797.563 177.119 792.927 170.732 787 165.257L815.041 121Z"></path>
+                    <path d="M744.443 267C756.886 278.55 766.067 290.099 771.985 301.649 778.662 314.719 782 329.308 782 345.416L782 400.81C782 417.526 774.868 434.851 760.604 452.783 748.161 468.588 732.683 482.19 714.17 493.587 696.568 504.529 682.077 510 670.696 510 660.225 510 648.921 508.48 636.781 505.441 627.525 503.161 616.447 499.59 603.549 494.727 592.624 490.624 581.774 486.521 571 482.417L574.87 473.299C584.885 475.275 595.317 477.288 606.167 479.34 617.016 481.392 626.842 482.417 635.643 482.417 655.066 482.417 675.324 476.187 696.416 463.725 715.536 452.327 731.849 437.928 745.354 420.528 758.859 403.127 765.612 387.436 765.612 373.455 765.612 361.449 762.121 348.836 755.141 335.614 749.527 324.977 741.636 314.035 731.469 302.789L744.443 267Z"></path>
+                    <path d="M396.417 271C404.009 283.427 409.172 294.414 411.906 303.961 415.702 317.449 417.6 335.861 417.6 359.199L445.617 359.199C460.043 359.199 470.293 357.002 476.367 352.607 481.681 348.819 484.339 342.984 484.339 335.104 484.339 330.709 484.073 326.276 483.542 321.806 483.01 317.335 482.213 312.448 481.15 307.144L490.261 293.504 493.906 315.554C497.246 330.406 501.726 341.09 507.344 347.606 513.57 354.88 522.378 358.517 533.767 358.517 537.259 358.517 539.955 357.419 541.853 355.221 543.751 353.024 544.7 350.258 544.7 346.924 544.7 339.347 542.346 331.239 537.639 322.601 534.146 316.236 529.515 309.871 523.744 303.506L539.005 278.729C546.143 290.398 550.470 298.354 551.989 302.597 555.330 312.145 557 326.011 557 344.196L557 398.753 539.005 398.753C529.894 398.753 521.884 397.503 514.975 395.002 508.066 392.502 501.043 388.523 493.906 383.068 487.528 388.826 481.833 392.691 476.822 394.661 469.685 397.389 459.283 398.753 445.617 398.753L417.6 398.753C417.6 412.695 414.259 426.258 407.578 439.443 398.922 456.567 385.711 470.131 367.944 480.133 345.622 492.711 317.681 499 284.122 499 253.752 499 230.518 493.696 214.422 483.088 196.807 471.419 188 453.536 188 429.441 188 416.408 189.594 403.223 192.783 389.887 195.972 376.551 200.3 363.140 205.767 349.652 209.107 341.469 214.878 328.890 223.078 311.917L232.189 316.009C221.559 337.831 214.536 355.032 211.119 367.61 207.703 380.188 205.994 391.706 205.994 402.163 205.994 420.954 212.714 435.237 226.153 445.012 239.592 454.787 258.763 459.674 283.667 459.674 312.822 459.674 338.865 454.597 361.794 444.444 390.342 431.865 404.617 414.286 404.617 391.706 404.617 376.551 401.807 362.155 396.189 348.515 391.785 337.756 385.559 327.451 377.511 317.6L396.417 271Z"></path>
+                </clipPath>
+                
+                <!-- TRACING GUIDE PATHS (INVISIBLE) -->
+                <g id="trace-guides" style="display: none;">
+                    <path id="trace-path-0" d="M931.786 302.789C935.876 299.84 941.827 290.547 951.417 288.638 961.007 286.728 975.9 286.504 989.325 291.333 1002.75 296.162 1017.87 306.495 1031.97 317.613 1046.07 328.732 1068.15 346.368 1084.65 356.891 1101.16 367.415 1127.48 376.858 1131 380.756 1129.87 381.542 1124.52 380.023 1105.76 380.281L1018.43 382.303 907.417 382.303C879.662 381.404 868.695 385.017 851.619 381.235 835.603 377.688 832.684 348.769 827.543 325.026 822.401 301.282 822.462 259.325 820.769 238.773 818.174 207.102 815.41 156.619 814 135"></path>
+                    <path id="trace-path-1" d="M744.232 284C745.524 286.364 759.854 310.013 764.785 326.672 769.716 343.331 775.068 366.128 773.815 383.955 772.563 401.783 766.862 418.738 757.271 433.637 747.680 448.535 734.003 462.962 716.268 473.346 698.534 483.73 674.073 494.863 650.862 495.943 627.651 497.022 586.281 482.542 577 479.824"></path>
+                    <path id="trace-path-2" d="M535.137 288.283C537.275 295.574 541.580 309.688 545.401 323.281 550.749 342.305 550.678 370.356 541.492 372.76 524.350 377.246 511.039 371.553 501.929 360.088 492.820 348.623 489.250 308.497 486.835 303.972 484.420 299.446 486.548 321.574 487.439 332.935 488.522 346.751 485.359 365.191 473.539 371.043 461.720 376.894 428.009 377.339 416.523 368.044 405.037 358.750 408.106 329.615 404.622 315.275 401.138 300.934 396.829 281.9 395.621 282 394.414 282.101 390.655 295.707 392.758 311.592 394.861 327.478 406.648 360.125 408.238 377.313 409.829 394.501 408.242 415.201 398.672 430.543 389.101 445.885 370.781 461.651 350.818 469.366 332.441 476.468 314.244 477.803 290.770 478.809 265.378 479.897 231.159 476.626 216.139 461.565 201.118 446.505 196.024 414.726 200.646 388.448 204.865 364.460 220.761 330.908 226.054 315.766"></path>
+                </g>
+            </defs>
+
+            <!-- SEMI-TRANSPARENT LETTER GUIDES (BACKGROUND) -->
+            <g id="guides" fill="#CCCCCC" fill-opacity="1"> 
+                <!-- These paths define the visible grey letters -->
+                <path d="M815.041 121C820.969 139.25 825.148 161.074 827.58 186.473 829.1 202.289 830.62 239.702 832.139 298.711 834.875 325.783 838.827 343.12 843.994 350.724 848.25 357.112 852.885 360.306 857.901 360.306L873.686 360.306 889.818 360.306 1059.49 360.306C1043.99 348.291 1030.91 338.938 1020.28 332.246 1007.05 323.881 994.97 317.798 984.027 313.996 971.717 309.737 959.254 307.608 946.639 307.608 938.888 307.608 931.061 308.141 923.157 309.205 927.565 297.951 933.34 288.902 940.484 282.058 950.819 272.173 963.889 267.23 979.696 267.23 995.198 267.23 1013.51 274.834 1034.64 290.043 1045.13 297.647 1062.22 312.095 1085.93 333.387 1104.32 349.964 1116.79 358.937 1123.32 360.306L1137 360.306 1137 400 889.818 400 873.686 400 857.901 400C847.566 400 839.283 395.818 833.051 387.453 827.58 380.153 823.438 369.279 820.627 354.831 817.815 340.383 815.649 322.589 814.129 301.449 813.217 284.263 812.267 266.621 811.279 248.523 810.292 230.425 809 216.699 807.404 207.346 805.808 197.993 803.642 190.351 800.907 184.419 797.563 177.119 792.927 170.732 787 165.257L815.041 121Z"></path>
+                <path d="M744.443 267C756.886 278.55 766.067 290.099 771.985 301.649 778.662 314.719 782 329.308 782 345.416L782 400.81C782 417.526 774.868 434.851 760.604 452.783 748.161 468.588 732.683 482.19 714.17 493.587 696.568 504.529 682.077 510 670.696 510 660.225 510 648.921 508.48 636.781 505.441 627.525 503.161 616.447 499.59 603.549 494.727 592.624 490.624 581.774 486.521 571 482.417L574.87 473.299C584.885 475.275 595.317 477.288 606.167 479.34 617.016 481.392 626.842 482.417 635.643 482.417 655.066 482.417 675.324 476.187 696.416 463.725 715.536 452.327 731.849 437.928 745.354 420.528 758.859 403.127 765.612 387.436 765.612 373.455 765.612 361.449 762.121 348.836 755.141 335.614 749.527 324.977 741.636 314.035 731.469 302.789L744.443 267Z"></path>
+                <path d="M396.417 271C404.009 283.427 409.172 294.414 411.906 303.961 415.702 317.449 417.6 335.861 417.6 359.199L445.617 359.199C460.043 359.199 470.293 357.002 476.367 352.607 481.681 348.819 484.339 342.984 484.339 335.104 484.339 330.709 484.073 326.276 483.542 321.806 483.01 317.335 482.213 312.448 481.15 307.144L490.261 293.504 493.906 315.554C497.246 330.406 501.726 341.09 507.344 347.606 513.57 354.88 522.378 358.517 533.767 358.517 537.259 358.517 539.955 357.419 541.853 355.221 543.751 353.024 544.7 350.258 544.7 346.924 544.7 339.347 542.346 331.239 537.639 322.601 534.146 316.236 529.515 309.871 523.744 303.506L539.005 278.729C546.143 290.398 550.470 298.354 551.989 302.597 555.330 312.145 557 326.011 557 344.196L557 398.753 539.005 398.753C529.894 398.753 521.884 397.503 514.975 395.002 508.066 392.502 501.043 388.523 493.906 383.068 487.528 388.826 481.833 392.691 476.822 394.661 469.685 397.389 459.283 398.753 445.617 398.753L417.6 398.753C417.6 412.695 414.259 426.258 407.578 439.443 398.922 456.567 385.711 470.131 367.944 480.133 345.622 492.711 317.681 499 284.122 499 253.752 499 230.518 493.696 214.422 483.088 196.807 471.419 188 453.536 188 429.441 188 416.408 189.594 403.223 192.783 389.887 195.972 376.551 200.3 363.140 205.767 349.652 209.107 341.469 214.878 328.890 223.078 311.917L232.189 316.009C221.559 337.831 214.536 355.032 211.119 367.61 207.703 380.188 205.994 391.706 205.994 402.163 205.994 420.954 212.714 435.237 226.153 445.012 239.592 454.787 258.763 459.674 283.667 459.674 312.822 459.674 338.865 454.597 361.794 444.444 390.342 431.865 404.617 414.286 404.617 391.706 404.617 376.551 401.807 362.155 396.189 348.515 391.785 337.756 385.559 327.451 377.511 317.6L396.417 271Z"></path>
+            </g>
+
+            <!-- USER DRAWING LAYER (CLIPPED) -->
+            <g clip-path="url(#letter-mask)">
+                <path id="drawing-path" stroke="#0000FF" stroke-width="60" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+            </g>
+            
+            <!-- ANIMATION GUIDE DOT (ON TOP) -->
+            <circle id="guide-dot" cx="937.5806884765625" cy="297.2046813964844" r="15" fill="#E74C3C" stroke="white" stroke-width="3" style="display: block;"></circle>
+        </svg>
+    </div>
+
+    <div class="buttons">
+        <button id="toggleTracingSoundButton" class="audio-icon-button" aria-label="كتم صوت التتبع">🔊</button>
+        <button id="playWordAudioButton" class="audio-icon-button" aria-label="تشغيل صوت الكلمة">▶️</button>
+        <button id="demo-button">عرض توضيحي</button> <!-- Translated text -->
+        <button id="clear-button">مسح الرسم</button> <!-- Translated text -->
+    </div>
+
+    <!-- Applause Effect Elements -->
+    <div id="confetti-container"></div>
+    <div id="applause-message"></div>
+
+    <script>
+        const svgContainer = document.getElementById('svg-container');
+        const svg = document.querySelector('svg'); 
+        const drawingPath = document.getElementById('drawing-path');
+        const demoButton = document.getElementById('demo-button');
+        const clearButton = document.getElementById('clear-button');
+        const guideDot = document.getElementById('guide-dot');
+        const traceGuides = Array.from(document.querySelectorAll('#trace-guides path'));
+        
+        // Zoom Elements
+        const zoomIcon = document.getElementById('zoom-icon');
+        const zoomAdjustControls = document.getElementById('zoom-adjust-controls');
+        const zoomInAdjustButton = document.getElementById('zoom-in-adjust-button');
+        const zoomOutAdjustButton = document.getElementById('zoom-out-adjust-button');
+
+        // Applause Effect Elements
+        const confettiContainer = document.getElementById('confetti-container');
+        const applauseMessage = document.getElementById('applause-message');
+
+        // New Buttons - Adjusted to reference their new class and purpose
+        const toggleTracingSoundButton = document.getElementById('toggleTracingSoundButton');
+        const playWordAudioButton = document.getElementById('playWordAudioButton');
+
+        // Audio Elements
+        let tracingSound;
+        try {
+            tracingSound = new Audio('sounds/coco2.mp3'); 
+            tracingSound.loop = true;
+            tracingSound.volume = 0.5; // Adjust volume as needed
+            tracingSound.addEventListener('error', (e) => {
+                console.error('Error loading tracing sound:', tracingSound.src, e);
+            });
+            console.log("Tracing sound object created successfully.");
+        } catch (e) {
+            console.error("Failed to create Audio object for tracing sound (check path/file):", e);
+        }
+
+        let completionSound;
+        try {
+            completionSound = new Audio('sounds/congra.mp3');
+            completionSound.volume = 0.7; // Adjust volume as needed
+            completionSound.addEventListener('error', (e) => {
+                console.error('Error loading completion sound:', completionSound.src, e);
+            });
+            console.log("Completion sound object created successfully.");
+        } catch (e) {
+            console.error("Failed to create Audio object for completion sound (check path/file):", e);
+        }
+        
+        let wordAudio;
+        try {
+            wordAudio = new Audio('sounds/animal.mp3'); // New word audio
+            wordAudio.volume = 0.8; // Adjust volume as needed
+            wordAudio.addEventListener('error', (e) => {
+                console.error('Error loading word audio:', wordAudio.src, e);
+            });
+            console.log("Word audio object created successfully.");
+        } catch (e) {
+            console.error("Failed to create Audio object for word audio (check path/file):", e);
+        }
+
+        // Initial setup for audio buttons (icons and aria-labels)
+        if (toggleTracingSoundButton && tracingSound) {
+            toggleTracingSoundButton.innerHTML = '🔊'; // Initial: not muted
+            toggleTracingSoundButton.setAttribute('aria-label', 'كتم صوت التتبع');
+        }
+        if (playWordAudioButton && wordAudio) {
+            playWordAudioButton.innerHTML = '▶️'; // Initial: paused
+            playWordAudioButton.setAttribute('aria-label', 'تشغيل صوت الكلمة');
+        }
+
+        // Event listener for completion sound to play word audio and update icon
+        if (completionSound && wordAudio) {
+            completionSound.addEventListener('ended', () => {
+                console.log("Completion sound ended, playing word audio.");
+                if (wordAudio.readyState >= 2) {
+                    wordAudio.currentTime = 0;
+                    wordAudio.play().then(() => {
+                        playWordAudioButton.innerHTML = '⏸️'; // Update icon to pause
+                        playWordAudioButton.setAttribute('aria-label', 'إيقاف صوت الكلمة مؤقتًا');
+                    }).catch(e => console.error("Error playing word audio after completion sound:", e));
+                } else {
+                    console.warn("Word audio not ready to play after completion sound. ReadyState:", wordAudio.readyState);
+                }
+            });
+        }
+
+
+        let isDrawing = false;
+        let animationFrameId = null; 
+        let guideDotAnimationId = null; 
+
+        let currentPathIndex = 0; 
+        let pathProgress = Array(traceGuides.length).fill(0); 
+        let tolerance = 40; 
+
+        let dotAnimationStartTime = null;
+        const dotAnimationDuration = 4000; 
+
+        // Zoom Variables
+        let isZoomed = false;
+        const defaultViewBox = "0 0 1280 720"; 
+        let originalViewBox = defaultViewBox; 
+        let initialZoomViewBox = null; // Stores the viewBox when zoom first activated for adjusting
+        let zoomOutStep = 0;
+        const TOTAL_ZOOM_OUT_STEPS = 8; 
+        const ZOOM_PADDING = 250; // Padding around the letter when zoomed for better centering and visibility
+        const ZOOM_IN_ICON = '🔍';
+        const ZOOM_OUT_ICON = '🔎';
+
+        // SVG Utility for coordinates
+        let svgPoint = svg.createSVGPoint(); 
+        let svgCTM = null; 
+
+        // Initialize path lengths
+        const pathLengths = traceGuides.map(path => path.getTotalLength());
+
+        // --- Utility Functions ---
+        function lerp(start, end, amt) {
+            return (1 - amt) * start + amt * end;
+        }
+
+        function isValidNumber(value) {
+            return typeof value === 'number' && isFinite(value);
+        }
+
+        // More robust SVG coordinate getter
+        function getSVGCoordinates(event) {
+            if (!svgPoint || !svg) return { x: -1, y: -1 };
+            const pt = svgPoint;
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+
+            pt.x = clientX;
+            pt.y = clientY; 
+            try {
+                const currentCTM = svg.getScreenCTM();
+                if (!currentCTM) {
+                    if (svgCTM) { 
+                        return pt.matrixTransform(svgCTM.inverse()); 
+                    }
+                    return { x: -1, y: -1 };
+                }
+                svgCTM = currentCTM;
+                return pt.matrixTransform(svgCTM.inverse());
+            } catch (e) {
+                console.warn("Error getting SVG CTM:", e);
+                return { x: -1, y: -1 };
+            }
+        }
+
+        function getClosestPointOnGuidePath(userPoint, pathElement, startLength, endLength) {
+            let minDistance = Infinity;
+            let closestPoint = null;
+            let closestLength = startLength;
+            const step = 5; 
+
+            for (let l = startLength; l <= endLength; l += step) {
+                const pathPoint = pathElement.getPointAtLength(l);
+                const distance = Math.sqrt(
+                    Math.pow(userPoint.x - pathPoint.x, 2) + 
+                    Math.pow(userPoint.y - pathPoint.y, 2)
+                );
+                
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestPoint = pathPoint;
+                    closestLength = l;
+                }
+            }
+            return { point: closestPoint, length: closestLength, distance: minDistance };
+        }
+
+        function getFullDrawingPathData() {
+            let fullPath = '';
+            for (let i = 0; i < traceGuides.length; i++) {
+                if (pathProgress[i] > 0) {
+                    fullPath += getPathSegment(traceGuides[i], 0, pathProgress[i]) + ' ';
+                }
+            }
+            return fullPath.trim(); 
+        }
+
+        function getPathSegment(path, from, to) {
+            if (from >= to) return ''; 
+
+            const p = path.getPointAtLength(from);
+            let data = `M ${p.x} ${p.y}`;
+            const step = 5; 
+            for (let i = from + step; i <= to; i += step) {
+                const p2 = path.getPointAtLength(i);
+                data += ` L ${p2.x} ${p2.y}`;
+            }
+            return data;
+        }
+
+        // --- Zoom Related Functions ---
+        function updateZoomAdjustButtonsState() {
+            if (!isZoomed) return;
+            zoomInAdjustButton.disabled = (zoomOutStep <= 0);
+            zoomOutAdjustButton.disabled = (zoomOutStep >= TOTAL_ZOOM_OUT_STEPS);
+        }
+
+        function adjustZoom(direction) {
+            if (!isZoomed || !svg) return;
+        
+            if (direction === 'in') {
+                zoomOutStep = Math.max(0, zoomOutStep - 1);
+            } else { 
+                zoomOutStep = Math.min(TOTAL_ZOOM_OUT_STEPS, zoomOutStep + 1);
+            }
+        
+            if (zoomOutStep >= TOTAL_ZOOM_OUT_STEPS) {
+                zoomOut(); // Go to full original view
+                return;
+            } else if (zoomOutStep <= 0) {
+                // If trying to zoom in further than initial, re-center on initial zoom
+                zoomToStroke(currentPathIndex, false); 
+                return;
+            }
+
+            try {
+                const startVB = initialZoomViewBox.split(' ').map(Number);
+                const endVB = originalViewBox.split(' ').map(Number); // This is the full SVG view
+
+                const fraction = zoomOutStep / TOTAL_ZOOM_OUT_STEPS;
+        
+                // Lerp between initial zoom (startVB) and full view (endVB)
+                const newX = lerp(startVB[0], endVB[0], fraction);
+                const newY = lerp(startVB[1], endVB[1], fraction);
+                const newWidth = lerp(startVB[2], endVB[2], fraction);
+                const newHeight = lerp(startVB[3], endVB[3], fraction);
+        
+                svg.style.transition = 'none'; 
+                svg.setAttribute('viewBox', `${newX} ${newY} ${newWidth} ${newHeight}`);
+                setTimeout(() => { 
+                    svg.style.transition = ''; 
+                    updateZoomAdjustButtonsState();
+                    try { svgCTM = svg.getScreenCTM(); } catch(e){} 
+                }, 50); 
+            } catch (e) {
+                console.error("Could not adjust zoom:", e);
+            }
+        }
+
+        function calculateZoomViewBox(targetIndex) { 
+            if (targetIndex >= traceGuides.length || !traceGuides[targetIndex]) return null; 
+            try { 
+                const path = traceGuides[targetIndex]; 
+                const bbox = path.getBBox(); 
+                const minDim = 50; // Minimum dimension for a zoom box
+                const safeWidth = Math.max(bbox.width, minDim); 
+                const safeHeight = Math.max(bbox.height, minDim); 
+                const centerX = bbox.x + bbox.width / 2; 
+                const centerY = bbox.y + bbox.height / 2; 
+                const newWidth = safeWidth + 2 * ZOOM_PADDING; 
+                const newHeight = safeHeight + 2 * ZOOM_PADDING; 
+                const newX = centerX - newWidth / 2; 
+                const newY = centerY - newHeight / 2; 
+                return `${newX} ${newY} ${newWidth} ${newHeight}`; 
+            } catch (e) { 
+                console.error("Error calculating zoom viewBox for index", targetIndex, ":", e);
+                return null; 
+            } 
+        }
+        
+        function zoomToStroke(targetIndex, instant = false) { 
+            const newViewBox = calculateZoomViewBox(targetIndex); 
+            if (!newViewBox) { 
+                zoomOut(instant); // Fallback to zoom out if target cannot be calculated
+                return; 
+            }
+            
+            initialZoomViewBox = newViewBox; // This is the specific zoom level for the current letter
+            zoomOutStep = 0; // Reset adjustment when new target is set
+
+            isZoomed = true; 
+            svgContainer.classList.add('zoomed-in'); 
+            zoomAdjustControls.classList.remove('hidden'); 
+            if (instant) svg.style.transition = 'none'; 
+            svg.setAttribute('viewBox', newViewBox); 
+            setTimeout(() => { 
+                if (instant) svg.style.transition = ''; 
+                try { svgCTM = svg.getScreenCTM(); } catch(e){} 
+                updateZoomIconPositionAndVisibility(); 
+                updateZoomAdjustButtonsState();
+            }, instant ? 10 : 350); 
+        }
+
+        function zoomOut(instant = false) { 
+            if (!originalViewBox) return; 
+            isZoomed = false; 
+            svgContainer.classList.remove('zoomed-in');
+            zoomAdjustControls.classList.add('hidden');
+            initialZoomViewBox = null; 
+            zoomOutStep = 0; 
+
+            if (instant) svg.style.transition = 'none'; 
+            svg.setAttribute('viewBox', originalViewBox); 
+            setTimeout(() => { 
+                if (instant) svg.style.transition = ''; 
+                try { svgCTM = svg.getScreenCTM(); } catch(e){} 
+                updateZoomIconPositionAndVisibility(); 
+            }, instant ? 10 : 350); 
+        }
+
+        function updateZoomIconPositionAndVisibility() { 
+            if (!zoomIcon) return; 
+            const shouldShow = traceGuides.length > 0; 
+            zoomIcon.classList.toggle('hidden', !shouldShow); 
+            if (shouldShow) { 
+                zoomIcon.innerHTML = isZoomed ? '🔎' : '🔍'; /* Translated icons */
+                zoomIcon.setAttribute('aria-label', isZoomed ? 'تصغير' : 'تكبير'); /* Translated aria-label */
+                zoomIcon.classList.toggle('zoomed', isZoomed); 
+            } 
+            if (!shouldShow || !isZoomed) {
+                zoomAdjustControls.classList.add('hidden');
+            } else {
+                zoomAdjustControls.classList.remove('hidden');
+            }
+        }
+        
+        function handleZoomIconClick() { 
+            if (isDrawing || traceGuides.length === 0) return; 
+            if (isZoomed) { 
+                zoomOut(); 
+            } else { 
+                zoomToStroke(currentPathIndex); 
+            } 
+        }
+        
+        function handleZoomInAdjust() { adjustZoom('in'); }
+        function handleZoomOutAdjust() { adjustZoom('out'); }
+
+        // === Continuous Animated Guide Dot Logic ===
+        function animateGuideDot(timestamp) {
+            if (!guideDotAnimationId) { 
+                guideDotAnimationId = requestAnimationFrame(animateGuideDot);
+                return;
+            }
+
+            if (currentPathIndex >= traceGuides.length) {
+                guideDot.style.display = 'none';
+                dotAnimationStartTime = null; 
+                cancelAnimationFrame(guideDotAnimationId);
+                guideDotAnimationId = null;
+                return;
+            }
+
+            const currentPath = traceGuides[currentPathIndex];
+            const pathLength = pathLengths[currentPathIndex];
+
+            // --- Robust checks for valid path length and currentPath ---
+            if (!currentPath || !isValidNumber(pathLength) || pathLength <= 0.01) { 
+                guideDot.style.display = 'none';
+                dotAnimationStartTime = null; // Reset animation if path is invalid
+                guideDotAnimationId = requestAnimationFrame(animateGuideDot); // Continue loop
+                return;
+            }
+            // --- END Robust checks ---
+
+            const startLength = pathProgress[currentPathIndex];
+            const endLength = pathLength; 
+            let segmentLength = endLength - startLength;
+
+            // Ensure all values are valid and finite before calculations
+            if (!isValidNumber(startLength) || !isValidNumber(endLength) || !isValidNumber(segmentLength) || segmentLength <= 0.01) { 
+                guideDot.style.display = 'none';
+                dotAnimationStartTime = null; // Reset animation if segment is invalid
+                guideDotAnimationId = requestAnimationFrame(animateGuideDot); // Continue loop
+                return;
+            }
+
+            if (isDrawing) {
+                const displayLength = Math.min(startLength + 20, endLength); 
+                // Validate displayLength before using it
+                if (!isValidNumber(displayLength) || displayLength < 0) {
+                    guideDot.style.display = 'none';
+                    dotAnimationStartTime = null;
+                    guideDotAnimationId = requestAnimationFrame(animateGuideDot);
+                    return;
+                }
+                try {
+                    const point = currentPath.getPointAtLength(displayLength);
+                    if (isValidNumber(point.x) && isValidNumber(point.y)) {
+                        guideDot.setAttribute('cx', point.x);
+                        guideDot.setAttribute('cy', point.y);
+                        guideDot.style.display = 'block';
+                    }
+                } catch (e) {
+                    console.warn("Error getting point at length during drawing:", e);
+                    guideDot.style.display = 'none';
+                }
+                dotAnimationStartTime = null; 
+            } else {
+                if (!dotAnimationStartTime) dotAnimationStartTime = timestamp;
+                const elapsedTime = timestamp - dotAnimationStartTime;
+
+                const segmentAnimationProgress = (elapsedTime % dotAnimationDuration) / dotAnimationDuration;
+                let animatedLength = startLength + (segmentLength * segmentAnimationProgress);
+                
+                // --- Ensure all calculated values are valid before calling getPointAtLength ---
+                if (!isValidNumber(animatedLength)) {
+                    guideDot.style.display = 'none';
+                    dotAnimationStartTime = null;
+                    guideDotAnimationId = requestAnimationFrame(animateGuideDot);
+                    return;
+                }
+                
+                const clampedLength = Math.max(0, Math.min(animatedLength, endLength - 0.01)); 
+                
+                // Final validation before calling getPointAtLength
+                if (!isValidNumber(clampedLength) || clampedLength < 0) {
+                    guideDot.style.display = 'none';
+                    dotAnimationStartTime = null;
+                    guideDotAnimationId = requestAnimationFrame(animateGuideDot);
+                    return;
+                }
+                
+                try {
+                    const point = currentPath.getPointAtLength(clampedLength);
+                    if (isValidNumber(point.x) && isValidNumber(point.y)) {
+                        guideDot.setAttribute('cx', point.x);
+                        guideDot.setAttribute('cy', point.y);
+                        guideDot.style.display = 'block';
+                    }
+                } catch (e) {
+                    console.warn("Error getting point at length during animation:", e);
+                    guideDot.style.display = 'none';
+                }
+            }
+            guideDotAnimationId = requestAnimationFrame(animateGuideDot);
+        }
+
+        function stopGuideDotAnimation() {
+            if (guideDotAnimationId) {
+                cancelAnimationFrame(guideDotAnimationId);
+                guideDotAnimationId = null;
+            }
+            dotAnimationStartTime = null; 
+            guideDot.style.display = 'none'; 
+        }
+        // === End Continuous Animated Guide Dot Logic ===
+
+
+        function startDrawing(event) {
+            if (animationFrameId) return; 
+            if (currentPathIndex >= traceGuides.length) return; 
+
+            const userPos = getSVGCoordinates(event); 
+            const currentPath = traceGuides[currentPathIndex];
+            const pathLength = pathLengths[currentPathIndex];
+
+            const initialSnapTolerance = tolerance * 1.5; 
+            const searchStart = Math.max(0, pathProgress[currentPathIndex] - initialSnapTolerance); 
+            const searchEnd = Math.min(pathLength, pathProgress[currentPathIndex] + initialSnapTolerance);
+            
+            const { point: snappedPoint, length: snappedLength, distance: snappedDistance } = 
+                getClosestPointOnGuidePath(userPos, currentPath, searchStart, searchEnd);
+
+            if (snappedPoint && snappedDistance <= initialSnapTolerance) {
+                isDrawing = true;
+                if (snappedLength >= pathProgress[currentPathIndex] - (tolerance / 2)) { 
+                     pathProgress[currentPathIndex] = snappedLength;
+                }
+               
+                drawingPath.setAttribute('d', getFullDrawingPathData());
+
+                // Play tracing sound
+                if (tracingSound && tracingSound.readyState >= 2 && tracingSound.paused) { 
+                    tracingSound.currentTime = 0; // Reset to start
+                    tracingSound.play().catch(e => console.error("Error playing tracing sound during play:", e));
+                } else if (tracingSound && tracingSound.readyState < 2) {
+                    console.warn("Tracing sound not yet ready or failed to load. ReadyState:", tracingSound.readyState);
+                } else if (!tracingSound) {
+                    console.error("Tracing sound object not initialized. Check for loading errors.");
+                }
+            }
+        }
+
+        function draw(event) {
+            if (!isDrawing) return;
+            event.preventDefault(); 
+            if (currentPathIndex >= traceGuides.length) return; 
+
+            const userPos = getSVGCoordinates(event); 
+            const currentPath = traceGuides[currentPathIndex];
+            const pathLength = pathLengths[currentPathIndex];
+
+            const lookAheadDistance = 50; 
+            const searchStart = Math.max(0, pathProgress[currentPathIndex] - (tolerance / 2)); 
+            const searchEnd = Math.min(pathLength, pathProgress[currentPathIndex] + lookAheadDistance);
+            
+            const { point: snappedPoint, length: snappedLength, distance: snappedDistance } = 
+                getClosestPointOnGuidePath(userPos, currentPath, searchStart, searchEnd);
+
+            if (snappedPoint && snappedDistance <= tolerance) {
+                const oldProgress = pathProgress[currentPathIndex];
+                let newProgress = snappedLength;
+
+                if (newProgress > oldProgress - (tolerance / 4)) { 
+                    pathProgress[currentPathIndex] = Math.min(pathLength, newProgress);
+                } else if (newProgress < oldProgress - (tolerance / 2)) { 
+                    pathProgress[currentPathIndex] = Math.max(0, newProgress); 
+                }
+                
+                drawingPath.setAttribute('d', getFullDrawingPathData());
+
+                if (pathProgress[currentPathIndex] >= pathLength - 20) { 
+                    console.log("Letter completed! Moving to next..."); // Debug
+                    isDrawing = false; 
+                    if (tracingSound && !tracingSound.paused) { 
+                        tracingSound.pause(); 
+                        tracingSound.currentTime = 0; 
+                    }
+
+                    currentPathIndex++; 
+                    console.log("Current path index:", currentPathIndex, "Total paths:", traceGuides.length); // Debug
+                    if (currentPathIndex < traceGuides.length) {
+                        dotAnimationStartTime = null; 
+                        animateGuideDot(); 
+                        // --- Automatic zoom transition to next letter (mimicking double-click behavior) ---
+                        if (isZoomed) { 
+                            // 1. Instant zoom out to full word
+                            zoomOut(true); 
+                            // 2. Smooth zoom to the new current letter after a delay
+                            setTimeout(() => {
+                                zoomToStroke(currentPathIndex, false); 
+                            }, 150); // Shorter delay for subtle transitions
+                        }
+                    } else {
+                        console.log("ALL LETTERS COMPLETED! Triggering applause effect and completion sound..."); // Debug
+                        stopGuideDotAnimation(); 
+                        
+                        // Play completion sound
+                        if (completionSound && completionSound.readyState >= 2) {
+                            completionSound.currentTime = 0; // Reset to start
+                            completionSound.play().catch(e => console.error("Error playing completion sound during play:", e));
+                        } else if (completionSound && completionSound.readyState < 2) {
+                            console.warn("Completion sound not yet ready or failed to load. ReadyState:", completionSound.readyState);
+                        } else if (!completionSound) {
+                            console.error("Completion sound object not initialized. Check for loading errors.");
+                        }
+
+                        // Zoom out to show full word, then trigger applause effect
+                        if (isZoomed) {
+                            zoomOut(false);
+                            setTimeout(() => {
+                                triggerApplauseEffect(); 
+                            }, 200); // Small delay to ensure zoom out completes first
+                        } else {
+                            // If not zoomed, trigger immediately
+                            triggerApplauseEffect(); 
+                        }
+                    }
+                }
+            } else {
+                // If user draws too far off, stop drawing and sound
+                isDrawing = false;
+                if (tracingSound && !tracingSound.paused) {
+                    tracingSound.pause();
+                    tracingSound.currentTime = 0;
+                }
+            }
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+            dotAnimationStartTime = null; 
+            animateGuideDot(); 
+            if (tracingSound && !tracingSound.paused) { 
+                tracingSound.pause();
+                tracingSound.currentTime = 0; 
+            }
+        }
+
+        function clearDrawing() {
+            if (animationFrameId) { 
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
+            currentPathIndex = 0;
+            pathProgress = Array(traceGuides.length).fill(0); 
+            
+            drawingPath.setAttribute('d', ''); 
+            demoButton.disabled = false;
+            
+            stopGuideDotAnimation(); 
+            animateGuideDot(); 
+            
+            // Stop any playing sounds and reset icons
+            if (tracingSound) {
+                if (!tracingSound.paused) {
+                    tracingSound.pause();
+                    tracingSound.currentTime = 0;
+                }
+                tracingSound.muted = false; // Ensure it's not muted
+                if (toggleTracingSoundButton) { // Check if element exists before updating
+                    toggleTracingSoundButton.innerHTML = '🔊';
+                    toggleTracingSoundButton.setAttribute('aria-label', 'كتم صوت التتبع');
+                }
+            }
+            if (completionSound && !completionSound.paused) {
+                completionSound.pause();
+                completionSound.currentTime = 0;
+            }
+            if (wordAudio) {
+                if (!wordAudio.paused) { // Stop word audio as well
+                    wordAudio.pause();
+                    wordAudio.currentTime = 0;
+                }
+                if (playWordAudioButton) { // Check if element exists before updating
+                    playWordAudioButton.innerHTML = '▶️';
+                    playWordAudioButton.setAttribute('aria-label', 'تشغيل صوت الكلمة');
+                }
+            }
+
+            // Reset zoom to full view when clearing
+            zoomOut(true); 
+        }
+
+        function runDemo() {
+            clearDrawing(); // Clears user drawing and resets state
+            demoButton.disabled = true;
+            stopGuideDotAnimation(); 
+            guideDot.style.display = 'block'; 
+
+            // Ensure demo starts with full view
+            zoomOut(true);
+
+            const totalDemoDuration = 8000; 
+            let startTime = null;
+
+            function animateDemoFrame(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const elapsedTime = timestamp - startTime;
+                const progressRatio = Math.min(elapsedTime / totalDemoDuration, 1);
+
+                let totalTotalLength = pathLengths.reduce((acc, len) => acc + len, 0); 
+                let lengthToCover = totalTotalLength * progressRatio; 
+                let cumulativeLength = 0;
+                let pathData = '';
+                
+                for (let i = 0; i < traceGuides.length; i++) {
+                    const s_path = traceGuides[i];
+                    const s_length = pathLengths[i];
+
+                    const lengthInCurrentPath = Math.max(0, lengthToCover - cumulativeLength);
+                    const currentProgressInPath = Math.min(lengthInCurrentPath, s_length);
+                    
+                    if (currentProgressInPath > 0) {
+                        pathData += getPathSegment(s_path, 0, currentProgressInPath) + ' ';
+                    }
+                    
+                    if (lengthToCover >= cumulativeLength && lengthToCover < cumulativeLength + s_length) {
+                        try {
+                            const point = s_path.getPointAtLength(currentProgressInPath);
+                            if (isValidNumber(point.x) && isValidNumber(point.y)) {
+                                guideDot.setAttribute('cx', point.x);
+                                guideDot.setAttribute('cy', point.y);
+                            }
+                        } catch (e) {
+                            console.warn("Error getting point during demo:", e);
+                        }
+                    }
+                    
+                    cumulativeLength += s_length;
+                }
+                
+                drawingPath.setAttribute('d', pathData.trim()); 
+                
+                if (progressRatio < 1) {
+                    animationFrameId = requestAnimationFrame(animateDemoFrame);
+                } else {
+                    animationFrameId = null;
+                    demoButton.disabled = false;
+                    guideDot.style.display = 'none'; 
+                    clearDrawing(); // Reset state to full view after demo
+                }
+            }
+            animationFrameId = requestAnimationFrame(animateDemoFrame);
+        }
+
+        // === Applause Effect Logic (Confetti) ===
+        function triggerApplauseEffect() {
+            // Ensure elements exist
+            if (!confettiContainer) {
+                console.error("confettiContainer not found!");
+                return;
+            }
+            if (!applauseMessage) {
+                console.error("applauseMessage not found!");
+                return;
+            }
+
+            // Set the message content (Translated)
+            applauseMessage.innerHTML = `
+                🎉 عمل رائع! 🎉
+                <div style="font-size: 0.5em; margin-top: 20px;">لقد تتبعت جميع الحروف!</div>
+            `;
+            
+            const confettiColors = [
+                '#FFC107', '#E91E63', '#9C27B0', '#00BCD4', '#8BC34A', '#FF9800',
+                '#FFEB3B', '#F44336', '#673AB7', '#03A9F4', '#CDDC39', '#FF5722',
+                '#FF4081', '#7C4DFF', '#4CAF50', '#FFC107', '#009688', '#FF6E40',
+                '#FF6347', '#BA55D3', '#00FA9A', '#FFD700', '#20B2AA', '#F08080' 
+            ]; // Expanded color palette for more variety
+            const numConfetti = 200; // Increased number of confetti pieces for more impact
+
+            // Clear any previous confetti pieces
+            confettiContainer.querySelectorAll('.confetti-piece').forEach(piece => piece.remove());
+
+            for (let i = 0; i < numConfetti; i++) {
+                const piece = document.createElement('div');
+                piece.classList.add('confetti-piece');
+                piece.style.backgroundColor = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+                piece.style.left = `${Math.random() * 100}vw`; 
+                piece.style.animationDelay = `${Math.random() * 2}s`; 
+                piece.style.animationDuration = `${2 + Math.random() * 2}s`; 
+                confettiContainer.appendChild(piece);
+            }
+
+            confettiContainer.classList.add('visible'); // Make confetti container visible
+            applauseMessage.classList.add('visible'); // Make message visible
+            
+            // Hide the applause effect after the animations complete
+            setTimeout(() => {
+                confettiContainer.classList.remove('visible'); 
+                applauseMessage.classList.remove('visible'); 
+                confettiContainer.innerHTML = ''; // Clear inner HTML to remove confetti pieces after they fall out of view
+                applauseMessage.innerHTML = ''; // Clear message content
+            }, 3500); 
+        }
+        // === End Applause Effect Logic ===
+
+        // Event Listeners - REMOVED mouseleave from SVG to prevent animation restart
+        svg.addEventListener('mousedown', startDrawing);
+        svg.addEventListener('mousemove', draw);
+        document.addEventListener('mouseup', stopDrawing);
+        // svg.addEventListener('mouseleave', stopDrawing); // REMOVED - this was causing animation restart
+
+        svg.addEventListener('touchstart', startDrawing, { passive: false });
+        svg.addEventListener('touchmove', draw, { passive: false });
+        document.addEventListener('touchend', stopDrawing);
+        
+        demoButton.addEventListener('click', runDemo);
+        clearButton.addEventListener('click', clearDrawing);
+
+        // New button event listeners
+        toggleTracingSoundButton.addEventListener('click', () => {
+            if (tracingSound) {
+                tracingSound.muted = !tracingSound.muted;
+                toggleTracingSoundButton.innerHTML = tracingSound.muted ? '🔇' : '🔊'; // Toggle icon
+                toggleTracingSoundButton.setAttribute('aria-label', tracingSound.muted ? 'إلغاء كتم صوت التتبع' : 'كتم صوت التتبع');
+            }
+        });
+
+        playWordAudioButton.addEventListener('click', () => {
+            if (wordAudio) {
+                if (wordAudio.paused) {
+                    wordAudio.currentTime = 0; // Always play from start on click
+                    wordAudio.play().then(() => {
+                        playWordAudioButton.innerHTML = '⏸️'; // Change to pause icon
+                        playWordAudioButton.setAttribute('aria-label', 'إيقاف صوت الكلمة مؤقتًا');
+                    }).catch(e => console.error("Error playing word audio:", e));
+                } else {
+                    wordAudio.pause();
+                    playWordAudioButton.innerHTML = '▶️'; // Change to play icon
+                    playWordAudioButton.setAttribute('aria-label', 'تشغيل صوت الكلمة');
+                }
+            }
+        });
+
+        // Add event listener for wordAudio 'ended' to reset its icon
+        if (wordAudio) {
+            wordAudio.addEventListener('ended', () => {
+                playWordAudioButton.innerHTML = '▶️'; // Reset to play icon when audio ends
+                playWordAudioButton.setAttribute('aria-label', 'تشغيل صوت الكلمة');
+            });
+        }
+
+        // Zoom event listeners - simplified without extra mouse events
+        zoomIcon.addEventListener('click', handleZoomIconClick);
+        zoomInAdjustButton.addEventListener('click', handleZoomInAdjust);
+        zoomOutAdjustButton.addEventListener('click', handleZoomOutAdjust);
+
+        // Update positions on window resize
+        window.addEventListener('resize', () => {
+            try { svgCTM = svg.getScreenCTM(); } catch(e){}
+            updateZoomIconPositionAndVisibility();
+            // If currently zoomed, re-calculate and apply zoom to recenter on current letter
+            if (isZoomed && currentPathIndex < traceGuides.length) {
+                 zoomToStroke(currentPathIndex, true); 
+            }
+        });
+
+
+        // Initialize on load
+        originalViewBox = svg.getAttribute('viewBox') || defaultViewBox;
+        animateGuideDot(); 
+        updateZoomIconPositionAndVisibility();
+        // Initial state: full view, no zoom active. User must click zoom icon to activate zoom.
+    </script>
+
+</body></html>
