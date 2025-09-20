@@ -5,64 +5,72 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تتبع الحروف بالترتيب</title>
     <style>
-        /* Base styles for full page and no scrolling - Reverted to original user's intent */
+        /* Base styles for full page and no scrolling */
         html, body {
             margin: 0;
             padding: 0;
+            height: 100%; /* Ensure body takes full viewport height */
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             display: flex;
-            flex-direction: column;
+            flex-direction: column; /* Stack children vertically */
             align-items: center;
-            justify-content: flex-start; /* Reverted to original flex-start */
-            min-height: 100vh; /* Reverted to original min-height for responsiveness */
-            margin: 0;
-            padding: 20px; /* Reverted to original padding */
+            justify-content: flex-start;
+            min-height: 100vh; /* Ensure body covers full viewport */
+            padding: 20px;
             background-color: white;
             text-align: center;
-            box-sizing: border-box; /* Keep border-box for consistent padding */
+            box-sizing: border-box;
         }
         h1 {
             color: #333;
             margin-top: 0;
             margin-bottom: 15px;
+            flex-shrink: 0; /* Prevent h1 from shrinking */
         }
         #svg-container {
             position: relative;
             width: 100%;
+            flex-grow: 1; /* Allow SVG container to take up remaining vertical space */
             border: 3px solid #333;
             border-radius: 12px;
             box-shadow: 0 6px 12px rgba(0,0,0,0.2);
-            touch-action: none; /* Crucial for preventing default touch scroll/zoom on SVG */
+            touch-action: none;
             background-color: white;
-            overflow: hidden; /* Keep to clip drawing outside letter boundaries */
-            transition: all 0.3s ease-in-out; /* For smooth viewBox transitions */
-            display: block;
-            height: auto; /* Allow height to adjust based on content/SVG */
+            overflow: hidden;
+            transition: all 0.3s ease-in-out;
+            display: flex; /* Use flexbox to center SVG horizontally if needed */
+            justify-content: center;
+            align-items: center;
         }
 
-        /* Responsive SVG specific styles - KEY CHANGE for scaling */
+        /* Responsive SVG specific styles */
         #svg {
             display: block;
             width: 100%;
-            height: auto; /* This is the key for maintaining aspect ratio and proper scaling */
+            height: 100%; /* Make SVG fill its flex container */
+            max-width: 100%; /* Ensure it scales down if container is narrower than intrinsic viewBox */
+            max-height: 100%; /* Ensure it scales down if container is shorter than intrinsic viewBox */
+            object-fit: contain; /* Scale content to fit in container, maintaining aspect ratio */
             cursor: crosshair;
-            transition: all 0.3s ease-in-out; /* Smooth viewBox transitions */
+            transition: all 0.3s ease-in-out;
         }
 
         .buttons {
-            margin-top: 25px; /* Reverted to original margin */
+            margin-top: 25px;
             display: flex;
-            gap: 15px; /* Reverted to original gap */
+            gap: 15px;
             justify-content: center;
             flex-wrap: wrap;
             align-items: center;
-            padding: 0; /* Reverted padding */
+            padding: 0;
+            flex-shrink: 0; /* Prevent buttons area from shrinking */
         }
-        button {
-            padding: 12px 25px; /* Reverted to original padding */
-            font-size: 18px; /* Reverted to original font size */
+        /* Generic button style (now primarily for legacy or fallback if icon buttons don't apply) */
+        button:not(.audio-icon-button) { /* Exclude audio-icon-button from these styles */
+            padding: 12px 25px;
+            font-size: 18px;
             cursor: pointer;
             border: 2px solid #333;
             border-radius: 8px;
@@ -72,8 +80,8 @@
             white-space: nowrap;
             margin: 5px;
         }
-        button:hover { background-color: #e9e9e9; }
-        button:active { transform: scale(0.95); }
+        button:not(.audio-icon-button):hover { background-color: #e9e9e9; }
+        button:not(.audio-icon-button):active { transform: scale(0.95); }
         button:disabled {
             cursor: not-allowed;
             background-color: #ccc;
@@ -83,14 +91,26 @@
             display: block;
         }
 
-        /* --- Zoom Controls CSS --- */
-        #zoom-icon {
+        /* --- New Wrapper for Zoom Controls (Top Right) --- */
+        #zoom-controls-wrapper-right {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            width: 40px;
-            height: 40px;
-            font-size: 20px;
+            top: 5px; /* Distance from top of SVG container */
+            right: 5px; /* Distance from right of SVG container */
+            z-index: 10;
+            display: flex;
+            flex-direction: column; /* Stack vertically: icon, then adjust controls */
+            align-items: flex-end; /* Align items to the right edge of the wrapper */
+            gap: 5px; /* Space between zoom icon and zoom adjust controls block */
+            padding: 5px; /* Small internal padding to keep buttons off the very edge */
+            pointer-events: none; /* Allow events to pass through the wrapper */
+        }
+
+        /* --- Zoom Icon & Adjust Controls (now flow within wrapper) --- */
+        #zoom-icon {
+            position: static; /* Let it flow naturally within its wrapper */
+            width: 30px; /* Default size */
+            height: 30px; /* Default size */
+            font-size: 16px; /* Default font size for icon */
             line-height: 1;
             background-color: rgba(255, 255, 255, 0.8);
             border: 1px solid #ccc;
@@ -101,8 +121,9 @@
             justify-content: center;
             padding: 0;
             color: #333;
-            z-index: 10;
             transition: background-color 0.2s;
+            margin: 0; /* Reset margins as gap handles spacing */
+            pointer-events: auto; /* Re-enable pointer events for the button */
         }
         #zoom-icon.zoomed {
             background-color: #e9e9e9;
@@ -112,21 +133,21 @@
         }
 
         #zoom-adjust-controls {
-            position: absolute;
-            top: 60px;
-            left: 10px;
+            position: static; /* Let it flow naturally within its wrapper */
             z-index: 10;
             display: flex;
-            flex-direction: column;
-            gap: 8px;
+            flex-direction: column; /* Keep +/- buttons stacked */
+            gap: 5px; /* Space between + and - buttons */
+            margin: 0; /* Reset margins */
+            pointer-events: none; /* Allow events to pass through the wrapper */
         }
         #zoom-adjust-controls.hidden {
             display: none;
         }
         #zoom-adjust-controls button {
-            width: 35px;
-            height: 35px;
-            font-size: 24px;
+            width: 30px; /* Default size */
+            height: 30px; /* Default size */
+            font-size: 20px; /* Default font size */
             font-weight: bold;
             line-height: 1;
             background-color: rgba(255, 255, 255, 0.8);
@@ -138,6 +159,7 @@
             justify-content: center;
             padding: 0;
             color: #333;
+            pointer-events: auto; /* Re-enable pointer events for the buttons */
         }
         #zoom-adjust-controls button:hover {
             background-color: white;
@@ -145,6 +167,40 @@
         #zoom-adjust-controls button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        /* --- Media Queries for Smaller Screens (Responsive Scaling) --- */
+        @media (max-width: 600px) {
+            #zoom-controls-wrapper-right {
+                top: 8px; /* Slightly more space from top on small screens */
+                right: 8px; /* Consistent right positioning */
+                gap: 3px; /* Reduced gap between main zoom icon and adjust controls */
+                padding: 3px; /* Reduced internal padding */
+            }
+
+            #zoom-icon {
+                width: 25px; /* Smaller size on small screens */
+                height: 25px; /* Smaller size on small screens */
+                font-size: 14px; /* Smaller font size for icon */
+            }
+
+            #zoom-adjust-controls {
+                gap: 3px; /* Reduced gap between +/- buttons */
+            }
+
+            #zoom-adjust-controls button {
+                width: 25px; /* Smaller size on small screens */
+                height: 25px; /* Smaller size on small screens */
+                font-size: 16px; /* Smaller font size */
+            }
+
+            /* Also make the main action buttons slightly smaller for better fit */
+            .buttons button.audio-icon-button {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+                margin: 3px; /* Reduce margin */
+            }
         }
 
         /* --- Applause Effect (Confetti) Styles --- */
@@ -157,7 +213,6 @@
             pointer-events: none;
             opacity: 0;
             z-index: 1000;
-            overflow: hidden;
             transition: opacity 0.5s ease-out;
             background-color: transparent;
         }
@@ -208,7 +263,7 @@
             }
         }
 
-        /* Specific styles for audio icon buttons */
+        /* Specific styles for all audio/action icon buttons */
         button.audio-icon-button {
             width: 50px;
             height: 50px;
@@ -239,22 +294,26 @@
 <body>
     <h1>تتبع الحروف بالترتيب!</h1>
     <div id="svg-container">
-        <!-- Zoom controls -->
-        <button id="zoom-icon" aria-label="تكبير/تصغير">🔍</button>
-        <div id="zoom-adjust-controls" class="hidden">
-            <button id="zoom-in-adjust-button" title="تكبير أكثر">+</button>
-            <button id="zoom-out-adjust-button" title="تصغير أكثر">-</button>
+        <!-- New wrapper for zoom controls to keep them grouped and responsive -->
+        <div id="zoom-controls-wrapper-right">
+            <button id="zoom-icon" aria-label="تكبير/تصغير">🔍</button>
+            <div id="zoom-adjust-controls" class="hidden">
+                <button id="zoom-in-adjust-button" title="تكبير أكثر">+</button>
+                <button id="zoom-out-adjust-button" title="تصغير أكثر">-</button>
+            </div>
         </div>
 
+        <!-- The viewBox will be set dynamically by JavaScript -->
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
             <defs>
+                <!-- ClipPath defining the union of all letter shapes for drawing -->
                 <clipPath id="letter-mask">
                     <path d="M815.041 121C820.969 139.25 825.148 161.074 827.58 186.473 829.1 202.289 830.62 239.702 832.139 298.711 834.875 325.783 838.827 343.12 843.994 350.724 848.25 357.112 852.885 360.306 857.901 360.306L873.686 360.306 889.818 360.306 1059.49 360.306C1043.99 348.291 1030.91 338.938 1020.28 332.246 1007.05 323.881 994.97 317.798 984.027 313.996 971.717 309.737 959.254 307.608 946.639 307.608 938.888 307.608 931.061 308.141 923.157 309.205 927.565 297.951 933.34 288.902 940.484 282.058 950.819 272.173 963.889 267.23 979.696 267.23 995.198 267.23 1013.51 274.834 1034.64 290.043 1045.13 297.647 1062.22 312.095 1085.93 333.387 1104.32 349.964 1116.79 358.937 1123.32 360.306L1137 360.306 1137 400 889.818 400 873.686 400 857.901 400C847.566 400 839.283 395.818 833.051 387.453 827.58 380.153 823.438 369.279 820.627 354.831 817.815 340.383 815.649 322.589 814.129 301.449 813.217 284.263 812.267 266.621 811.279 248.523 810.292 230.425 809 216.699 807.404 207.346 805.808 197.993 803.642 190.351 800.907 184.419 797.563 177.119 792.927 170.732 787 165.257L815.041 121Z"/>
                     <path d="M744.443 267C756.886 278.55 766.067 290.099 771.985 301.649 778.662 314.719 782 329.308 782 345.416L782 400.81C782 417.526 774.868 434.851 760.604 452.783 748.161 468.588 732.683 482.19 714.17 493.587 696.568 504.529 682.077 510 670.696 510 660.225 510 648.921 508.48 636.781 505.441 627.525 503.161 616.447 499.59 603.549 494.727 592.624 490.624 581.774 486.521 571 482.417L574.87 473.299C584.885 475.275 595.317 477.288 606.167 479.34 617.016 481.392 626.842 482.417 635.643 482.417 655.066 482.417 675.324 476.187 696.416 463.725 715.536 452.327 731.849 437.928 745.354 420.528 758.859 403.127 765.612 387.436 765.612 373.455 765.612 361.449 762.121 348.836 755.141 335.614 749.527 324.977 741.636 314.035 731.469 302.789L744.443 267Z"/>
                     <path d="M396.417 271C404.009 283.427 409.172 294.414 411.906 303.961 415.702 317.449 417.6 335.861 417.6 359.199L445.617 359.199C460.043 359.199 470.293 357.002 476.367 352.607 481.681 348.819 484.339 342.984 484.339 335.104 484.339 330.709 484.073 326.276 483.542 321.806 483.01 317.335 482.213 312.448 481.15 307.144L490.261 293.504 493.906 315.554C497.246 330.406 501.726 341.09 507.344 347.606 513.57 354.88 522.378 358.517 533.767 358.517 537.259 358.517 539.955 357.419 541.853 355.221 543.751 353.024 544.7 350.258 544.7 346.924 544.7 339.347 542.346 331.239 537.639 322.601 534.146 316.236 529.515 309.871 523.744 303.506L539.005 278.729C546.143 290.398 550.470 298.354 551.989 302.597 555.330 312.145 557 326.011 557 344.196L557 398.753 539.005 398.753C529.894 398.753 521.884 397.503 514.975 395.002 508.066 392.502 501.043 388.523 493.906 383.068 487.528 388.826 481.833 392.691 476.822 394.661 469.685 397.389 459.283 398.753 445.617 398.753L417.6 398.753C417.6 412.695 414.259 426.258 407.578 439.443 398.922 456.567 385.711 470.131 367.944 480.133 345.622 492.711 317.681 499 284.122 499 253.752 499 230.518 493.696 214.422 483.088 196.807 471.419 188 453.536 188 429.441 188 416.408 189.594 403.223 192.783 389.887 195.972 376.551 200.3 363.140 205.767 349.652 209.107 341.469 214.878 328.890 223.078 311.917L232.189 316.009C221.559 337.831 214.536 355.032 211.119 367.61 207.703 380.188 205.994 391.706 205.994 402.163 205.994 420.954 212.714 435.237 226.153 445.012 239.592 454.787 258.763 459.674 283.667 459.674 312.822 459.674 338.865 454.597 361.794 444.444 390.342 431.865 404.617 414.286 404.617 391.706 404.617 376.551 401.807 362.155 396.189 348.515 391.785 337.756 385.559 327.451 377.511 317.6L396.417 271Z"/>
                 </clipPath>
 
-                <!-- TRACING GUIDE PATHS (INVISIBLE) -->
+                <!-- TRACING GUIDE PATHS (INVISIBLE) - these are the actual paths for tracing -->
                 <g id="trace-guides" style="display: none;">
                     <path id="trace-path-0" d="M931.786 302.789C935.876 299.84 941.827 290.547 951.417 288.638 961.007 286.728 975.9 286.504 989.325 291.333 1002.75 296.162 1017.87 306.495 1031.97 317.613 1046.07 328.732 1068.15 346.368 1084.65 356.891 1101.16 367.415 1127.48 376.858 1131 380.756 1129.87 381.542 1124.52 380.023 1105.76 380.281L1018.43 382.303 907.417 382.303C879.662 381.404 868.695 385.017 851.619 381.235 835.603 377.688 832.684 348.769 827.543 325.026 822.401 301.282 822.462 259.325 820.769 238.773 818.174 207.102 815.41 156.619 814 135"/>
                     <path id="trace-path-1" d="M744.232 284C745.524 286.364 759.854 310.013 764.785 326.672 769.716 343.331 775.068 366.128 773.815 383.955 772.563 401.783 766.862 418.738 757.271 433.637 747.680 448.535 734.003 462.962 716.268 473.346 698.534 483.73 674.073 494.863 650.862 495.943 627.651 497.022 586.281 482.542 577 479.824"/>
@@ -262,16 +321,15 @@
                 </g>
             </defs>
 
-            <!-- SEMI-TRANSPARENT LETTER GUIDES (BACKGROUND) -->
+            <!-- SEMI-TRANSPARENT LETTER GUIDES (BACKGROUND) - ALWAYS VISIBLE -->
             <g id="guides" fill="#CCCCCC" fill-opacity="1">
                 <!-- These paths define the visible grey letters -->
                 <path d="M815.041 121C820.969 139.25 825.148 161.074 827.58 186.473 829.1 202.289 830.62 239.702 832.139 298.711 834.875 325.783 838.827 343.12 843.994 350.724 848.25 357.112 852.885 360.306 857.901 360.306L873.686 360.306 889.818 360.306 1059.49 360.306C1043.99 348.291 1030.91 338.938 1020.28 332.246 1007.05 323.881 994.97 317.798 984.027 313.996 971.717 309.737 959.254 307.608 946.639 307.608 938.888 307.608 931.061 308.141 923.157 309.205 927.565 297.951 933.34 288.902 940.484 282.058 950.819 272.173 963.889 267.23 979.696 267.23 995.198 267.23 1013.51 274.834 1034.64 290.043 1045.13 297.647 1062.22 312.095 1085.93 333.387 1104.32 349.964 1116.79 358.937 1123.32 360.306L1137 360.306 1137 400 889.818 400 873.686 400 857.901 400C847.566 400 839.283 395.818 833.051 387.453 827.58 380.153 823.438 369.279 820.627 354.831 817.815 340.383 815.649 322.589 814.129 301.449 813.217 284.263 812.267 266.621 811.279 248.523 810.292 230.425 809 216.699 807.404 207.346 805.808 197.993 803.642 190.351 800.907 184.419 797.563 177.119 792.927 170.732 787 165.257L815.041 121Z"/>
                 <path d="M744.443 267C756.886 278.55 766.067 290.099 771.985 301.649 778.662 314.719 782 329.308 782 345.416L782 400.81C782 417.526 774.868 434.851 760.604 452.783 748.161 468.588 732.683 482.19 714.17 493.587 696.568 504.529 682.077 510 670.696 510 660.225 510 648.921 508.48 636.781 505.441 627.525 503.161 616.447 499.59 603.549 494.727 592.624 490.624 581.774 486.521 571 482.417L574.87 473.299C584.885 475.275 595.317 477.288 606.167 479.34 617.016 481.392 626.842 482.417 635.643 482.417 655.066 482.417 675.324 476.187 696.416 463.725 715.536 452.327 731.849 437.928 745.354 420.528 758.859 403.127 765.612 387.436 765.612 373.455 765.612 361.449 762.121 348.836 755.141 335.614 749.527 324.977 741.636 314.035 731.469 302.789L744.443 267Z"/>
                 <path d="M396.417 271C404.009 283.427 409.172 294.414 411.906 303.961 415.702 317.449 417.6 335.861 417.6 359.199L445.617 359.199C460.043 359.199 470.293 357.002 476.367 352.607 481.681 348.819 484.339 342.984 484.339 335.104 484.339 330.709 484.073 326.276 483.542 321.806 483.01 317.335 482.213 312.448 481.15 307.144L490.261 293.504 493.906 315.554C497.246 330.406 501.726 341.09 507.344 347.606 513.57 354.88 522.378 358.517 533.767 358.517 537.259 358.517 539.955 357.419 541.853 355.221 543.751 353.024 544.7 350.258 544.7 346.924 544.7 339.347 542.346 331.239 537.639 322.601 534.146 316.236 529.515 309.871 523.744 303.506L539.005 278.729C546.143 290.398 550.470 298.354 551.989 302.597 555.330 312.145 557 326.011 557 344.196L557 398.753 539.005 398.753C529.894 398.753 521.884 397.503 514.975 395.002 508.066 392.502 501.043 388.523 493.906 383.068 487.528 388.826 481.833 392.691 476.822 394.661 469.685 397.389 459.283 398.753 445.617 398.753L417.6 398.753C417.6 412.695 414.259 426.258 407.578 439.443 398.922 456.567 385.711 470.131 367.944 480.133 345.622 492.711 317.681 499 284.122 499 253.752 499 230.518 493.696 214.422 483.088 196.807 471.419 188 453.536 188 429.441 188 416.408 189.594 403.223 192.783 389.887 195.972 376.551 200.3 363.140 205.767 349.652 209.107 341.469 214.878 328.890 223.078 311.917L232.189 316.009C221.559 337.831 214.536 355.032 211.119 367.61 207.703 380.188 205.994 391.706 205.994 402.163 205.994 420.954 212.714 435.237 226.153 445.012 239.592 454.787 258.763 459.674 283.667 459.674 312.822 459.674 338.865 454.597 361.794 444.444 390.342 431.865 404.617 414.286 404.617 391.706 404.617 376.551 401.807 362.155 396.189 348.515 391.785 337.756 385.559 327.451 377.511 317.6L396.417 271Z"/>
-                </g>
-            </defs>
+            </g>
 
-            <!-- USER DRAWING LAYER (CLIPPED) -->
+            <!-- USER DRAWING LAYER (CLIPPED by all letter shapes) -->
             <g clip-path="url(#letter-mask)">
                 <path id="drawing-path" stroke="#0000FF" stroke-width="60" stroke-linecap="round" stroke-linejoin="round" fill="none" />
             </g>
@@ -284,8 +342,9 @@
     <div class="buttons">
         <button id="toggleTracingSoundButton" class="audio-icon-button" aria-label="كتم صوت التتبع">🔊</button>
         <button id="playWordAudioButton" class="audio-icon-button" aria-label="تشغيل صوت الكلمة">▶️</button>
-        <button id="demo-button">عرض توضيحي</button>
-        <button id="clear-button">مسح الرسم</button>
+        <!-- Changed to icon buttons, using existing audio-icon-button class -->
+        <button id="demo-button" class="audio-icon-button" aria-label="عرض توضيحي">✨</button>
+        <button id="clear-button" class="audio-icon-button" aria-label="مسح الرسم">🗑️</button>
     </div>
 
     <!-- Applause Effect Elements -->
@@ -299,7 +358,10 @@
         const demoButton = document.getElementById('demo-button');
         const clearButton = document.getElementById('clear-button');
         const guideDot = document.getElementById('guide-dot');
-        const traceGuides = Array.from(document.querySelectorAll('#trace-guides path'));
+
+        // References to guide letter paths (grey background letters) and trace paths (invisible target paths)
+        const traceGuidePaths = Array.from(document.querySelectorAll('#trace-guides path'));
+        const traceGuides = traceGuidePaths; // Keep traceGuides for existing logic
 
         // Zoom Elements
         const zoomIcon = document.getElementById('zoom-icon');
@@ -318,7 +380,7 @@
         // Audio Elements
         let tracingSound;
         try {
-            tracingSound = new Audio('sounds/coco2.mp3');
+            tracingSound = new Audio('sounds/coco2.mp3'); // Ensure this path is correct
             tracingSound.loop = true;
             tracingSound.volume = 0.5;
             tracingSound.addEventListener('error', (e) => {
@@ -330,7 +392,7 @@
 
         let completionSound;
         try {
-            completionSound = new Audio('sounds/congra.mp3');
+            completionSound = new Audio('sounds/congra.mp3'); // Ensure this path is correct
             completionSound.volume = 0.7;
             completionSound.addEventListener('error', (e) => {
                 console.error('Error loading completion sound:', completionSound.src, e);
@@ -341,7 +403,7 @@
 
         let wordAudio;
         try {
-            wordAudio = new Audio('sounds/animal.mp3');
+            wordAudio = new Audio('sounds/animal.mp3'); // Ensure this path is correct
             wordAudio.volume = 0.8;
             wordAudio.addEventListener('error', (e) => {
                 console.error('Error loading word audio:', wordAudio.src, e);
@@ -390,12 +452,19 @@
 
         // Zoom Variables
         let isZoomed = false;
-        const defaultViewBox = "0 0 1280 720";
-        let originalViewBox = defaultViewBox;
+        // SVG's intrinsic content size (from the viewBox attribute in the HTML)
+        const SVG_INTRINSIC_WIDTH = 1280; // These are just reference, originalViewBox will be calculated
+        const SVG_INTRINSIC_HEIGHT = 720;
+
+        let originalViewBox = `0 0 ${SVG_INTRINSIC_WIDTH} ${SVG_INTRINSIC_HEIGHT}`; // Will be dynamically calculated
         let initialZoomViewBox = null;
         let zoomOutStep = 0;
         const TOTAL_ZOOM_OUT_STEPS = 8;
-        const ZOOM_PADDING = 250;
+        const DRAWING_STROKE_WIDTH = 60; // Define the stroke width of the drawing path
+
+        // New constant for controlling zoomed-in letter size
+        const ZOOM_VIEWPORT_OCCUPANCY_PERCENTAGE = 0.8; // Target: letter bounding box occupies 80% of the smaller dimension
+
         const ZOOM_IN_ICON = '🔍';
         const ZOOM_OUT_ICON = '🔎';
 
@@ -405,6 +474,11 @@
 
         // Initialize path lengths
         const pathLengths = traceGuides.map(path => path.getTotalLength());
+
+        // Flags for completion logic
+        let applauseFinished = false;
+        let wordAudioFinished = false;
+
 
         // --- Utility Functions ---
         function lerp(start, end, amt) {
@@ -424,12 +498,10 @@
             pt.x = clientX;
             pt.y = clientY;
             try {
-                // We only need to update svgCTM when the viewBox changes or on window resize.
-                // For performance, cache it and re-calculate only when necessary.
                 if (!svgCTM) {
                     svgCTM = svg.getScreenCTM();
                 }
-                if (!svgCTM) { // Fallback if still null
+                if (!svgCTM) {
                     console.warn("SVG CTM is null or undefined.");
                     return { x: -1, y: -1 };
                 }
@@ -462,12 +534,17 @@
             return { point: closestPoint, length: closestLength, distance: minDistance };
         }
 
+        // This function now accumulates all traced segments for persistent color
         function getFullDrawingPathData() {
             let fullPath = '';
-            for (let i = 0; i < traceGuides.length; i++) {
-                if (pathProgress[i] > 0) {
-                    fullPath += getPathSegment(traceGuides[i], 0, pathProgress[i]) + ' ';
+            for (let i = 0; i < currentPathIndex; i++) {
+                if (pathProgress[i] > 0 && pathLengths[i] > 0) {
+                    fullPath += getPathSegment(traceGuides[i], 0, pathLengths[i]) + ' '; // Draw the full letter
                 }
+            }
+            // Draw the active segment for the current letter
+            if (currentPathIndex < traceGuides.length && pathProgress[currentPathIndex] > 0) {
+                fullPath += getPathSegment(traceGuides[currentPathIndex], 0, pathProgress[currentPathIndex]) + ' ';
             }
             return fullPath.trim();
         }
@@ -477,7 +554,7 @@
 
             const p = path.getPointAtLength(from);
             let data = `M ${p.x} ${p.y}`;
-            const step = 5;
+            const step = 5; // Smaller step for smoother segments
             for (let i = from + step; i <= to; i += step) {
                 const p2 = path.getPointAtLength(i);
                 data += ` L ${p2.x} ${p2.y}`;
@@ -525,7 +602,7 @@
                 setTimeout(() => {
                     svg.style.transition = '';
                     updateZoomAdjustButtonsState();
-                    svgCTM = svg.getScreenCTM(); // Update CTM after viewBox change
+                    svgCTM = svg.getScreenCTM();
                 }, 50);
             } catch (e) {
                 console.error("Could not adjust zoom:", e);
@@ -537,16 +614,68 @@
             try {
                 const path = traceGuides[targetIndex];
                 const bbox = path.getBBox();
-                const minDim = 50;
-                const safeWidth = Math.max(bbox.width, minDim);
-                const safeHeight = Math.max(bbox.height, minDim);
-                const centerX = bbox.x + bbox.width / 2;
-                const centerY = bbox.y + bbox.height / 2;
-                const newWidth = safeWidth + 2 * ZOOM_PADDING;
-                const newHeight = safeHeight + 2 * ZOOM_PADDING;
-                const newX = centerX - newWidth / 2;
-                const newY = centerY - newHeight / 2;
-                return `${newX} ${newY} ${newWidth} ${newHeight}`;
+                const minDim = 50; // Minimum dimension for a letter's bbox, to avoid excessively tight zooms
+
+                // Account for stroke width to ensure the visual outline is included
+                const effectiveStrokeOffset = DRAWING_STROKE_WIDTH / 2;
+                const paddedMinX = bbox.x - effectiveStrokeOffset;
+                const paddedMinY = bbox.y - effectiveStrokeOffset;
+                const paddedMaxX = bbox.x + bbox.width + effectiveStrokeOffset;
+                const paddedMaxY = bbox.y + bbox.height + effectiveStrokeOffset;
+
+                const contentWidth = Math.max(paddedMaxX - paddedMinX, minDim);
+                const contentHeight = Math.max(paddedMaxY - paddedMinY, minDim);
+
+                // Get the actual rendered dimensions of the SVG container
+                const containerRect = svgContainer.getBoundingClientRect();
+                if (containerRect.width <= 0 || containerRect.height <= 0) {
+                    console.warn("SVG container has no visible dimensions, cannot calculate zoom viewBox.");
+                    return null;
+                }
+                const containerAspectRatio = containerRect.width / containerRect.height;
+
+                let viewBoxWidth, viewBoxHeight;
+
+                // Determine the desired viewBox dimensions based on fitting content
+                // and matching the container's aspect ratio, ensuring the content occupies
+                // ZOOM_VIEWPORT_OCCUPANCY_PERCENTAGE of the *constraining* dimension.
+                const targetContentRatio = contentWidth / contentHeight;
+
+                if (targetContentRatio > containerAspectRatio) {
+                    // Content is relatively wider than the container, fit by width
+                    viewBoxWidth = contentWidth / ZOOM_VIEWPORT_OCCUPANCY_PERCENTAGE;
+                    viewBoxHeight = viewBoxWidth / containerAspectRatio; // Scale height to match container's aspect ratio
+                } else {
+                    // Content is relatively taller than the container, fit by height
+                    viewBoxHeight = contentHeight / ZOOM_VIEWPORT_OCCUPANCY_PERCENTAGE;
+                    viewBoxWidth = viewBoxHeight * containerAspectRatio; // Scale width to match container's aspect ratio
+                }
+
+                // Ensure the calculated viewBox doesn't zoom out more than the initial overall viewBox
+                const [originalX, originalY, originalWidth, originalHeight] = originalViewBox.split(' ').map(Number);
+                viewBoxWidth = Math.min(viewBoxWidth, originalWidth);
+                viewBoxHeight = Math.min(viewBoxHeight, originalHeight);
+
+                // Calculate center of the padded content
+                const centerX = paddedMinX + contentWidth / 2;
+                const centerY = paddedMinY + contentHeight / 2;
+
+                let finalViewBoxMinX = centerX - (viewBoxWidth / 2);
+                let finalViewBoxMinY = centerY - (viewBoxHeight / 2);
+
+                // Clamp to originalViewBox bounds
+                finalViewBoxMinX = Math.max(originalX, finalViewBoxMinX);
+                finalViewBoxMinY = Math.max(originalY, finalViewBoxMinY);
+                finalViewBoxMinX = Math.min(finalViewBoxMinX, originalX + originalWidth - viewBoxWidth);
+                finalViewBoxMinY = Math.min(finalViewBoxMinY, originalY + originalHeight - viewBoxHeight);
+
+                // Final check for positive dimensions
+                if (viewBoxWidth <= 0 || viewBoxHeight <= 0) {
+                     console.error("Calculated viewBox has non-positive dimensions.");
+                     return null;
+                }
+
+                return `${finalViewBoxMinX} ${finalViewBoxMinY} ${viewBoxWidth} ${viewBoxHeight}`;
             } catch (e) {
                 console.error("Error calculating zoom viewBox for index", targetIndex, ":", e);
                 return null;
@@ -570,7 +699,7 @@
             svg.setAttribute('viewBox', newViewBox);
             setTimeout(() => {
                 if (instant) svg.style.transition = '';
-                svgCTM = svg.getScreenCTM(); // Update CTM after viewBox change
+                svgCTM = svg.getScreenCTM();
                 updateZoomIconPositionAndVisibility();
                 updateZoomAdjustButtonsState();
             }, instant ? 10 : 350);
@@ -588,7 +717,7 @@
             svg.setAttribute('viewBox', originalViewBox);
             setTimeout(() => {
                 if (instant) svg.style.transition = '';
-                svgCTM = svg.getScreenCTM(); // Update CTM after viewBox change
+                svgCTM = svg.getScreenCTM();
                 updateZoomIconPositionAndVisibility();
             }, instant ? 10 : 350);
         }
@@ -621,33 +750,28 @@
         function handleZoomInAdjust() { adjustZoom('in'); }
         function handleZoomOutAdjust() { adjustZoom('out'); }
 
-        // === Continuous Animated Guide Dot Logic (Modified to handle drawing updates) ===
+        // === Continuous Animated Guide Dot Logic ===
         function animateGuideDot(timestamp) {
-            // Self-scheduling the next frame
             guideDotAnimationId = requestAnimationFrame(animateGuideDot);
 
-            // --- Handle Drawing Path Updates (batched) ---
-            if (drawingNeedsUpdate) { // Only update if the flag is set
+            if (drawingNeedsUpdate) {
                 drawingPath.setAttribute('d', getFullDrawingPathData());
-                drawingNeedsUpdate = false; // Reset flag after updating DOM
+                drawingNeedsUpdate = false;
             }
-            // --- End Drawing Path Updates ---
 
-            // Check if all paths are completed OR if the current path is invalid,
-            // then stop animating and clear the dot.
             if (currentPathIndex >= traceGuides.length ||
                 !traceGuides[currentPathIndex] ||
                 !isValidNumber(pathLengths[currentPathIndex]) || pathLengths[currentPathIndex] <= 0.01) {
                 guideDot.style.display = 'none';
                 dotAnimationStartTime = null;
-                return; // Stop processing dot animation for this frame, but keep rAF loop going for other updates
+                return;
             }
 
             const currentPath = traceGuides[currentPathIndex];
             const pathLength = pathLengths[currentPathIndex];
 
             if (isDrawing) {
-                const displayLength = Math.min(pathProgress[currentPathIndex] + 20, pathLength); // Show dot slightly ahead
+                const displayLength = Math.min(pathProgress[currentPathIndex] + 20, pathLength);
                 if (isValidNumber(displayLength) && displayLength >= 0) {
                     try {
                         const point = currentPath.getPointAtLength(displayLength);
@@ -661,9 +785,8 @@
                         guideDot.style.display = 'none';
                     }
                 }
-                dotAnimationStartTime = null; // Reset animation if drawing actively
+                dotAnimationStartTime = null;
             } else {
-                // If not drawing, animate the dot along the current path from its progress point
                 if (!dotAnimationStartTime) dotAnimationStartTime = timestamp;
                 const elapsedTime = timestamp - dotAnimationStartTime;
 
@@ -711,11 +834,10 @@
         function stopGuideDotAnimation() {
             if (guideDotAnimationId) {
                 cancelAnimationFrame(guideDotAnimationId);
-                guideDotAnimationId = null; // Important: Clear the ID so it can be restarted later
+                guideDotAnimationId = null;
             }
             dotAnimationStartTime = null;
             guideDot.style.display = 'none';
-            // Ensure any last drawing update is rendered when stopping
             if (drawingNeedsUpdate) {
                 drawingPath.setAttribute('d', getFullDrawingPathData());
                 drawingNeedsUpdate = false;
@@ -740,22 +862,21 @@
 
             if (snappedPoint && snappedDistance <= initialSnapTolerance) {
                 isDrawing = true;
-                if (snappedLength >= pathProgress[currentPathIndex] - (tolerance / 2)) {
-                     pathProgress[currentPathIndex] = snappedLength;
-                     drawingNeedsUpdate = true; // Mark for update, will be processed in rAF
+                // Allow drawing slightly backward within tolerance, but primarily forward
+                if (snappedLength > pathProgress[currentPathIndex] || (snappedLength >= pathProgress[currentPathIndex] - (tolerance / 4))) {
+                     pathProgress[currentPathIndex] = Math.min(pathLength, snappedLength);
+                     drawingNeedsUpdate = true;
                 }
 
-                // Only attempt to play if tracing sound is ready, paused, and not muted
                 if (tracingSound && tracingSound.readyState >= 2 && tracingSound.paused && !tracingSound.muted) {
                     tracingSound.currentTime = 0;
                     tracingSound.play().catch(e => {
-                        // Catch and ignore AbortError, which is common if play() is interrupted by a rapid pause()
                         if (e.name !== "AbortError") {
                             console.error("Error playing tracing sound during play:", e);
                         }
                     });
                 } else if (tracingSound && tracingSound.muted) {
-                    console.log("Tracing sound is muted, not playing.");
+                    // console.log("Tracing sound is muted, not playing.");
                 } else if (tracingSound && tracingSound.readyState < 2) {
                     console.warn("Tracing sound not yet ready or failed to load. ReadyState:", tracingSound.readyState);
                 } else if (!tracingSound) {
@@ -784,26 +905,27 @@
                 const oldProgress = pathProgress[currentPathIndex];
                 let newProgress = snappedLength;
 
+                // Allow drawing forward, or slightly backward within a small threshold for smoother experience
                 if (newProgress > oldProgress - (tolerance / 4)) {
                     pathProgress[currentPathIndex] = Math.min(pathLength, newProgress);
-                    drawingNeedsUpdate = true; // Mark for update
-                } else if (newProgress < oldProgress - (tolerance / 2)) {
+                    drawingNeedsUpdate = true;
+                } else if (newProgress < oldProgress - (tolerance / 2)) { // Allow more significant backward drawing if far off
                     pathProgress[currentPathIndex] = Math.max(0, newProgress);
-                    drawingNeedsUpdate = true; // Mark for update
+                    drawingNeedsUpdate = true;
                 }
 
 
                 if (pathProgress[currentPathIndex] >= pathLength - 20) {
                     isDrawing = false;
-                    // Only pause if sound is currently playing
                     if (tracingSound && !tracingSound.paused) {
                         tracingSound.pause();
                         tracingSound.currentTime = 0;
                     }
 
-                    drawingNeedsUpdate = true;
+                    drawingNeedsUpdate = true; // Mark for drawing update to ensure final segment is drawn
 
                     currentPathIndex++;
+
                     if (currentPathIndex < traceGuides.length) {
                         dotAnimationStartTime = null;
                         if (isZoomed) {
@@ -812,61 +934,95 @@
                                 zoomToStroke(currentPathIndex, false);
                             }, 150);
                         }
-                    } else {
+                    } else { // All letters completed
                         stopGuideDotAnimation();
-                        drawingNeedsUpdate = true;
-
-                        if (completionSound && completionSound.readyState >= 2) {
-                            completionSound.currentTime = 0;
-                            completionSound.play().catch(e => console.error("Error playing completion sound during play:", e));
-                        } else if (completionSound && completionSound.readyState < 2) {
-                            console.warn("Completion sound not yet ready or failed to load. ReadyState:", completionSound.readyState);
-                        } else if (!completionSound) {
-                            console.error("Completion sound object not initialized. Check for loading errors.");
-                        }
+                        drawingNeedsUpdate = true; // Ensure all drawn paths are fully visible
 
                         if (isZoomed) {
                             zoomOut(false);
-                            setTimeout(() => {
-                                triggerApplauseEffect();
-                            }, 200);
+                            // Delay the completion sequence slightly to allow zoomOut transition
+                            setTimeout(() => handleAllLettersCompleted(), 350);
                         } else {
-                            triggerApplauseEffect();
+                            handleAllLettersCompleted();
                         }
                     }
                 }
             } else {
-                // If user draws too far off the path, stop drawing and sound
                 isDrawing = false;
-                // Only pause if sound is currently playing
                 if (tracingSound && !tracingSound.paused) {
                     tracingSound.pause();
                     tracingSound.currentTime = 0;
                 }
-                dotAnimationStartTime = null; // Resume normal dot animation
+                dotAnimationStartTime = null;
             }
         }
 
         function stopDrawing() {
             isDrawing = false;
-            // Only pause if sound is currently playing
             if (tracingSound && !tracingSound.paused) {
                 tracingSound.pause();
                 tracingSound.currentTime = 0;
             }
-            // Ensure any last drawing update is rendered
             if (drawingNeedsUpdate) {
                 drawingPath.setAttribute('d', getFullDrawingPathData());
                 drawingNeedsUpdate = false;
             }
-            dotAnimationStartTime = null; // Resume dot animation
+            dotAnimationStartTime = null;
+        }
+
+        // Handles the sequence for all letters being completed (sound, applause, then clear)
+        function handleAllLettersCompleted() {
+            // Reset flags
+            applauseFinished = false;
+            wordAudioFinished = false;
+
+            // Play completion sound
+            if (completionSound && completionSound.readyState >= 2) {
+                completionSound.currentTime = 0;
+                completionSound.play().catch(e => console.error("Error playing completion sound:", e));
+            } else if (completionSound) {
+                console.warn("Completion sound not ready to play.");
+                // If completion sound fails, we might still want to play word audio
+                if (wordAudio && wordAudio.readyState >= 2) {
+                    wordAudio.currentTime = 0;
+                    wordAudio.play().catch(e => console.error("Error playing word audio:", e));
+                }
+            }
+
+            // Start applause effect (confetti only, no message)
+            triggerApplauseEffect();
+            setTimeout(() => {
+                applauseFinished = true;
+                checkAndClearDrawing();
+            }, 3500); // Applause animation duration
+
+            // Listen for word audio to finish. If wordAudio exists and is ready, this will handle it.
+            function wordAudioEndedHandler() {
+                wordAudioFinished = true;
+                checkAndClearDrawing();
+                wordAudio.removeEventListener('ended', wordAudioEndedHandler); // Remove listener after use
+            }
+
+            if (wordAudio && wordAudio.readyState >= 2) {
+                wordAudio.addEventListener('ended', wordAudioEndedHandler, { once: true });
+            } else {
+                // If no wordAudio or it's not ready, consider it finished immediately
+                wordAudioFinished = true;
+                checkAndClearDrawing();
+            }
+        }
+
+        function checkAndClearDrawing() {
+            if (applauseFinished && wordAudioFinished) {
+                clearDrawing();
+            }
         }
 
         function clearDrawing() {
             currentPathIndex = 0;
             pathProgress = Array(traceGuides.length).fill(0);
 
-            drawingPath.setAttribute('d', '');
+            drawingPath.setAttribute('d', ''); // Clear the blue tracing
             drawingNeedsUpdate = false;
             demoButton.disabled = false;
 
@@ -874,6 +1030,8 @@
             if (guideDotAnimationId === null) {
                  guideDotAnimationId = requestAnimationFrame(animateGuideDot);
             }
+
+            // Grey guide letters are always visible, so no action needed here.
 
             if (tracingSound) {
                 if (!tracingSound.paused) {
@@ -902,6 +1060,7 @@
             }
 
             zoomOut(true);
+            calculateAndSetInitialViewBox(); // Recalculate and set originalViewBox for proper reset
         }
 
         function runDemo() {
@@ -912,7 +1071,7 @@
 
             zoomOut(true);
 
-            const totalDemoDuration = 15000; // Increased duration for slower demo
+            const totalDemoDuration = 15000; // Adjust demo duration as needed
             let startTime = null;
             let demoAnimationFrameId = null;
 
@@ -926,6 +1085,8 @@
                 let cumulativeLength = 0;
                 let pathData = '';
 
+                let currentDemoPathIndex = 0;
+
                 for (let i = 0; i < traceGuides.length; i++) {
                     const s_path = traceGuides[i];
                     const s_length = pathLengths[i];
@@ -938,6 +1099,7 @@
                     }
 
                     if (lengthToCover >= cumulativeLength && lengthToCover < cumulativeLength + s_length) {
+                        currentDemoPathIndex = i; // Identify the current letter for dot animation
                         try {
                             const point = s_path.getPointAtLength(currentProgressInPath);
                             if (isValidNumber(point.x) && isValidNumber(point.y)) {
@@ -960,7 +1122,8 @@
                     demoAnimationFrameId = null;
                     demoButton.disabled = false;
                     guideDot.style.display = 'none';
-                    clearDrawing();
+                    // After demo, just clear the drawing, no applause or sounds for demo
+                    setTimeout(() => clearDrawing(), 500); // Small delay before clearing
                 }
             }
             demoAnimationFrameId = requestAnimationFrame(animateDemoFrame);
@@ -973,10 +1136,8 @@
                 return;
             }
 
-            applauseMessage.innerHTML = `
-                🎉 عمل رائع! 🎉
-                <div style="font-size: 0.5em; margin-top: 20px;">لقد تتبعت جميع الحروف!</div>
-            `;
+            // No message for applause, as requested
+            applauseMessage.innerHTML = '';
 
             const confettiColors = [
                 '#FFC107', '#E91E63', '#9C27B0', '#00BCD4', '#8BC34A', '#FF9800',
@@ -999,16 +1160,81 @@
             }
 
             confettiContainer.classList.add('visible');
-            applauseMessage.classList.add('visible');
+            // applauseMessage.classList.add('visible'); // No message content, so no need to make message div visible
 
             setTimeout(() => {
                 confettiContainer.classList.remove('visible');
-                applauseMessage.classList.remove('visible');
+                // applauseMessage.classList.remove('visible'); // No message
                 confettiContainer.innerHTML = '';
-                applauseMessage.innerHTML = '';
+                // applauseMessage.innerHTML = ''; // Already empty
             }, 3500);
         }
         // === End Applause Effect Logic ===
+
+        // --- Initial ViewBox Calculation ---
+        function calculateAndSetInitialViewBox() {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            let hasPaths = false;
+
+            // Use ALL paths from the #guides group for a comprehensive bounding box
+            // These are the visual representation of the letters.
+            document.querySelectorAll('#guides path').forEach(path => {
+                try {
+                    const bbox = path.getBBox();
+                    if (bbox.width > 0 && bbox.height > 0) {
+                        // Account for the visual extent due to the stroke thickness (DRAWING_STROKE_WIDTH)
+                        // Even though the guide paths themselves don't have stroke, the traced path does,
+                        // and we want the viewBox to contain the *potential* maximum visual extent.
+                        const effectiveStrokeOffset = DRAWING_STROKE_WIDTH / 2;
+                        minX = Math.min(minX, bbox.x - effectiveStrokeOffset);
+                        minY = Math.min(minY, bbox.y - effectiveStrokeOffset);
+                        maxX = Math.max(maxX, bbox.x + bbox.width + effectiveStrokeOffset);
+                        maxY = Math.max(maxY, bbox.y + bbox.height + effectiveStrokeOffset);
+                        hasPaths = true;
+                    }
+                } catch (e) {
+                    console.warn("Error getting bbox for a guide path during initial viewBox calculation:", e);
+                }
+            });
+
+            if (!hasPaths) {
+                console.warn("No valid guide paths found or bboxes are zero. Using default fallback viewBox.");
+                // Fallback to a reasonable default if no paths exist or have zero bbox
+                originalViewBox = `0 0 1280 720`; // A default 16:9 aspect ratio
+                svg.setAttribute('viewBox', originalViewBox);
+                return;
+            }
+
+            const contentWidth = maxX - minX;
+            const contentHeight = maxY - minY;
+
+            // Add a robust percentage-based padding to give more space around the letters
+            const overallPaddingRatio = 0.20; // 20% padding on all sides relative to content size
+            const horizontalPadding = contentWidth * overallPaddingRatio;
+            const verticalPadding = contentHeight * overallPaddingRatio;
+
+            // Also ensure a minimum absolute padding in case content is very small
+            const minAbsolutePadding = 60; // minimum 60 SVG units padding
+            const finalHorizontalPadding = Math.max(horizontalPadding, minAbsolutePadding);
+            const finalVerticalPadding = Math.max(verticalPadding, minAbsolutePadding);
+
+            const viewBoxX = minX - finalHorizontalPadding;
+            const viewBoxY = minY - finalVerticalPadding;
+            const viewBoxWidth = contentWidth + (2 * finalHorizontalPadding);
+            const viewBoxHeight = contentHeight + (2 * finalVerticalPadding);
+
+            // Ensure viewBox dimensions are positive
+            if (viewBoxWidth <= 0 || viewBoxHeight <= 0) {
+                 console.error("Calculated viewBox has non-positive dimensions, falling back to default.");
+                 originalViewBox = `0 0 1280 720`;
+            } else {
+                originalViewBox = `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`;
+            }
+
+            svg.setAttribute('viewBox', originalViewBox);
+            console.log("Calculated initial viewBox to fit all letters with padding:", originalViewBox);
+        }
+
 
         // Event Listeners
         svg.addEventListener('mousedown', startDrawing);
@@ -1057,19 +1283,18 @@
         zoomInAdjustButton.addEventListener('click', handleZoomInAdjust);
         zoomOutAdjustButton.addEventListener('click', handleZoomOutAdjust);
 
-        // Update positions on window resize/orientation change
+        // Update SVG CTM and viewBox on window resize/orientation change
         window.addEventListener('resize', () => {
-            svgCTM = null; // Clear cached CTM to force recalculation on resize
+            svgCTM = null; // Invalidate cached CTM
+            calculateAndSetInitialViewBox(); // Recalculate and set originalViewBox
             updateZoomIconPositionAndVisibility();
             if (isZoomed && currentPathIndex < traceGuides.length) {
-                 zoomToStroke(currentPathIndex, true);
+                 zoomToStroke(currentPathIndex, true); // Re-calculate zoom to fit new aspect ratio
             }
         });
 
-
         // Initialize on load
-        originalViewBox = svg.getAttribute('viewBox') || defaultViewBox;
-        // Start the main animation loop only once
+        calculateAndSetInitialViewBox(); // Calculate and set initial viewBox based on all letters
         if (guideDotAnimationId === null) {
             guideDotAnimationId = requestAnimationFrame(animateGuideDot);
         }
